@@ -322,7 +322,8 @@ export const generateWAMessageContent = async(
 			buttonText: message.buttonText,
 			title: message.title,
 			footerText: message.footer,
-			description: message.text
+			description: message.text,
+			listType: message.listType
 		}
 
 		m = { listMessage }

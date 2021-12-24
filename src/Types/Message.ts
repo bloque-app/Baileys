@@ -67,6 +67,7 @@ type Listable = {
 
     /** Text of the bnutton on the list (required) */
     buttonText?: string
+    listType?: proto.ListMessage.ListMessageListType
 }
 type WithDimensions = {
     width?: number
