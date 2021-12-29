@@ -323,7 +323,7 @@ export const generateWAMessageContent = async(
 			title: message.title,
 			footerText: message.footer,
 			description: message.text,
-			listType: message.listType
+			listType: 1
 		}
 
 		m = { listMessage }
