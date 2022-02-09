@@ -20,6 +20,7 @@ const startSock = () => {
 		logger: P({ level: 'trace' }),
 		printQRInTerminal: true,
 		auth: state,
+		browser: ['BloqueV2', 'Chrome', '1.0.0'],
 		// implement to handle retries
 		getMessage: async key => {
 			return {
@@ -69,6 +70,7 @@ const startSock = () => {
 		if(connection === 'close') {
 			// reconnect if not logged out
 			if((lastDisconnect.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut) {
+				console.log('#'.repeat(10), ' restart ')
 				startSock()
 			} else {
 				console.log('connection closed')
