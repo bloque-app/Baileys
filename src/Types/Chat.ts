@@ -1,4 +1,4 @@
-import type { proto } from "../../WAProto"
+import type { proto } from '../../WAProto'
 
 /** set of statuses visible to other people; see updatePresence() in WhatsAppWeb.Send */
 export type WAPresence = 'unavailable' | 'available' | 'composing' | 'recording' | 'paused'
@@ -10,7 +10,10 @@ export interface PresenceData {
     lastSeen?: number
 }
 
-export type ChatMutation = { syncAction: proto.ISyncActionData, index: string[], indexMac: Uint8Array, valueMac: Uint8Array, operation: number }
+export type ChatMutation = { 
+    syncAction: proto.ISyncActionData
+    index: string[]
+}
 
 export type AppStateChunk = { totalMutations : ChatMutation[], collectionsToHandle: WAPatchName[] }
 

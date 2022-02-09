@@ -9,9 +9,8 @@ export * from './Socket'
 export * from './Events'
 
 import type NodeCache from 'node-cache'
-
-import { AuthenticationState, AuthenticationCreds } from './Auth'
 import { proto } from '../../WAProto'
+import { AuthenticationState } from './Auth'
 import { CommonSocketConfig } from './Socket'
 
 export type SocketConfig = CommonSocketConfig<AuthenticationState> & {
@@ -19,8 +18,6 @@ export type SocketConfig = CommonSocketConfig<AuthenticationState> & {
     userDevicesCache?: NodeCache
     /** map to store the retry counts for failed messages */
     msgRetryCounterMap?: { [msgId: string]: number }
-    /** custom domains to push media via */
-    customUploadHosts: string[]
     /** 
      * fetch a message from your store 
      * implement this so that messages failed to send (solves the "this message can take a while" issue) can be retried
@@ -36,7 +33,7 @@ export enum DisconnectReason {
 	loggedOut = 401,
     badSession = 500,
     restartRequired = 410,
-    multideviceMismatch = 403
+    multideviceMismatch = 411
 }
 
 export type WAInitResponse = {
@@ -45,17 +42,18 @@ export type WAInitResponse = {
     status: 200
 }
 
-type WABusinessHoursConfig = {
+export type WABusinessHoursConfig = {
     day_of_week: string
     mode: string
     open_time?: number
     close_time?: number
 }
+
 export type WABusinessProfile = {
     description: string
     email: string
     business_hours:  {
-        timezone: string
+        timezone?: string
         config?:  WABusinessHoursConfig[]
         business_config?: WABusinessHoursConfig[]
     }
@@ -66,5 +64,6 @@ export type WABusinessProfile = {
     }[]
     wid?: string
 }
+
 
 export type CurveKeyPair = { private: Uint8Array; public: Uint8Array }

@@ -1,10 +1,10 @@
-# Baileys MD - Typescript/Javascript WhatsApp Web API
+# Baileys - Typescript/Javascript WhatsApp Web API
  
- Early Multi-Device Edition. Breaks completely from master.
-
  Baileys does not require Selenium or any other browser to be interface with WhatsApp Web, it does so directly using a **WebSocket**. Not running Selenium or Chromimum saves you like **half a gig** of ram :/ 
 
- Thank you to [@pokearaujo](https://github.com/pokearaujo/multidevice) for writing his observations on the workings of WhatsApp Multi-Device.
+ Baileys supports interacting with the multi-device & web versions of WhatsApp.
+
+ Thank you to [@pokearaujo](https://github.com/pokearaujo/multidevice) for writing his observations on the workings of WhatsApp Multi-Device. Also, thank you to [@Sigalor](https://github.com/sigalor/whatsapp-web-reveng) for writing his observations on the workings of WhatsApp Web and thanks to [@Rhymen](https://github.com/Rhymen/go-whatsapp/) for the __go__ implementation.
 
  Baileys is type-safe, extensible and simple to use. If you require more functionality than provided, it'll super easy for you to write an extension. More on this [here](#WritingCustomFunctionality).
  
@@ -19,8 +19,10 @@ Do check out & run [example.ts](Example/example.ts) to see example usage of the 
 The script covers most common use cases.
 To run the example script, download or clone the repo and then type the following in terminal:
 1. ``` cd path/to/Baileys ```
-2. ``` yarn```
-3. ``` yarn example ```
+2. ``` yarn ```
+3. 
+    - ``` yarn example ``` for the multi-device edition
+    - ``` yarn example:legacy ``` for the legacy web edition
 
 ## Install
 
@@ -76,12 +78,13 @@ If the connection is successful, you will see a QR code printed on your terminal
 
 **Note:** install `qrcode-terminal` using `yarn add qrcode-terminal` to auto-print the QR to the terminal.
 
-## Notable Differences Between Baileys Web & MD
+## Notable Differences Between Baileys v3 & v4
 
 1. Baileys has been written from the ground up to have a more "functional" structure. This is done primarily for simplicity & more testability
-2. Baileys no longer maintains an internal state of chats/contacts/messages. You must take this on your own, simply because your state in MD is its own source of truth & there is no one-size-fits-all way to handle the storage for this.
-3. A baileys "socket" is meant to be a temporary & disposable object -- this is done to maintain simplicity & prevent bugs. I felt the entire Baileys object became too bloated as it supported too many configurations. You're encouraged to write your own implementation to handle missing functionality.
-4. Moreover, Baileys does not offer an inbuilt reconnect mechanism anymore (though it's super easy to set one up on your own with your own rules, check the example script)
+2. The Baileys event emitter will emit all events and be used to generate a source of truth for the connected user's account. Access the event emitter using (`sock.ev`)
+3. Baileys no longer maintains an internal state of chats/contacts/messages. You should ideally take this on your own, simply because your state in MD is its own source of truth & there is no one-size-fits-all way to handle the storage for this. However, a simple storage extension has been provided. This also serves as a good demonstration of how to use the Baileys event emitter to construct a source of truth.
+4. A baileys "socket" is meant to be a temporary & disposable object -- this is done to maintain simplicity & prevent bugs. I felt the entire Baileys object became too bloated as it supported too many configurations. You're encouraged to write your own implementation to handle missing functionality.
+5. Moreover, Baileys does not offer an inbuilt reconnect mechanism anymore (though it's super easy to set one up on your own with your own rules, check the example script)
 
 ## Configuring the Connection
 
@@ -178,8 +181,12 @@ export type BaileysEventMap = {
 	'connection.update': Partial<ConnectionState>
     /** auth credentials updated -- some pre key state, device ID etc. */
     'creds.update': Partial<AuthenticationCreds>
-    /** set chats (history sync), messages are reverse chronologically sorted */
-    'chats.set': { chats: Chat[], messages: WAMessage[], contacts: Contact[] }
+    /** set chats (history sync), chats are reverse chronologically sorted */
+    'chats.set': { chats: Chat[], isLatest: boolean }
+    /** set messages (history sync), messages are reverse chronologically sorted */
+    'messages.set': { messages: WAMessage[], isLatest: boolean }
+    /** set contacts (history sync) */
+    'contacts.set': { contacts: Contact[] }
     /** upsert chats */
     'chats.upsert': Chat[]
     /** update the given chats */
@@ -219,6 +226,73 @@ sock.ev.on('messages.upsert', ({ messages }) => {
     console.log('got messages', messages)
 })
 
+```
+
+## Implementing a Data Store
+
+As mentioned earlier, Baileys does not come with a defacto storage for chats, contacts, messages. However, a simple in-memory implementation has been provided. The store listens for chat updates, new messages, message updates etc. to always have an up to date version of the data.
+
+It can be used as follows:
+
+``` ts
+import makeWASocket, { makeInMemoryStore } from '@adiwajshing/baileys-md'
+// the store maintains the data of the WA connection in memory
+// can be written out to a file & read from it
+const store = makeInMemoryStore({ })
+// can be read from a file
+store.readFromFile('./baileys_store.json')
+// saves the state to a file every 10s
+setInterval(() => {
+    store.writeToFile('./baileys_store.json')
+}, 10_000)
+
+const sock = makeWASocket({ })
+// will listen from this socket
+// the store can listen from a new socket once the current socket outlives its lifetime
+store.bind(sock.ev)
+
+sock.ev.on('chats.set', () => {
+    // can use "store.chats" however you want, even after the socket dies out
+    // "chats" => a KeyedDB instance
+    console.log('got chats', store.chats.all())
+})
+
+sock.ev.on('contacts.set', () => {
+    console.log('got contacts', Object.values(store.contacts))
+})
+
+```
+
+The store also provides some simple functions such as `loadMessages` that utilize the store to speed up data retrieval.
+
+**Note:** I highly recommend building your own data store especially for MD connections, as storing someone's entire chat history in memory is a terrible waste of RAM.
+
+## Using the Legacy Version
+
+The API for the legacy and MD versions has been made as similar as possible so ya'll can switch between them seamlessly.
+
+Example on using the eg. version:
+``` ts
+import P from "pino"
+import { Boom } from "@hapi/boom"
+import { makeWALegacySocket } from '@adiwajshing/baileys-md'
+
+// store can be used with legacy version as well
+const store = makeInMemoryStore({ logger: P().child({ level: 'debug', stream: 'store' }) })
+
+const sock = makeWALegacySocket({
+    logger: P({ level: 'debug' }),
+    printQRInTerminal: true,
+    auth: state
+})
+// bind to the socket
+store.bind(sock.ev)
+```
+
+If you need a type representing either the legacy or MD version:
+``` ts
+// this type can have any of the socket types underneath
+import { AnyWASocket } from '@adiwajshing/baileys-md'
 ```
 
 ## Sending Messages
@@ -308,7 +382,7 @@ const listMessage = {
   text: "This is a list",
   footer: "nice footer, link: https://google.com",
   title: "Amazing boldfaced list title",
-  buttonText: "Required, text on the button to vie the list",
+  buttonText: "Required, text on the button to view the list",
   sections
 }
 
@@ -513,7 +587,6 @@ WA uses an encrypted form of communication to send chat/app updates. This has be
 
 - Delete message for me
   ``` ts
-  // mark it unread
   await sock.chatModify(
       { clear: { message: { id: 'ATWYHDNNWU81732J', fromMe: true } } }, 
       '123456@s.whatsapp.net', 
@@ -583,6 +656,11 @@ await sock.sendMessage(
     await sock.updateBlockStatus("xyz@s.whatsapp.net", "block") // Block user
     await sock.updateBlockStatus("xyz@s.whatsapp.net", "unblock") // Unblock user
     ```
+- To get a business profile, such as description, category
+    ```ts
+    const profile = await sock.getBusinessProfile("xyz@s.whatsapp.net")
+    console.log("business description: " + profile.description + ", category: " + profile.category)
+    ```
 Of course, replace ``` xyz ``` with an actual ID. 
 
 ## Groups
@@ -628,15 +706,20 @@ Of course, replace ``` xyz ``` with an actual ID.
     const code = await sock.groupInviteCode("abcd-xyz@g.us")
     console.log("group code: " + code)
     ```
+- To revoke the invite code in a group
+    ```ts
+    const code = await sock.groupRevokeInvite("abcd-xyz@g.us")
+    console.log("New group code: " + code)
+    ```
 - To query the metadata of a group
     ``` ts
     const metadata = await sock.groupMetadata("abcd-xyz@g.us") 
     console.log(metadata.id + ", title: " + metadata.subject + ", description: " + metadata.desc)
     ```
-- To join the group using the invitation code (not supported yet)
+- To join the group using the invitation code
     ``` ts
-    const response = await sock.acceptInvite("xxx")
-    console.log("joined to: " + response.gid)
+    const response = await sock.groupAcceptInvite("xxx")
+    console.log("joined to: " + response)
     ```
     Of course, replace ``` xxx ``` with invitation code.
 

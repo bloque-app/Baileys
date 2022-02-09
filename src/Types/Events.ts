@@ -1,20 +1,22 @@
-import type EventEmitter from "events"
-
+import type EventEmitter from 'events'
 import { AuthenticationCreds } from './Auth'
 import { Chat, PresenceData } from './Chat'
 import { Contact } from './Contact'
-import { ConnectionState } from './State'
-
 import { GroupMetadata, ParticipantAction } from './GroupMetadata'
-import { MessageInfoUpdate, MessageUpdateType, WAMessage, WAMessageUpdate, WAMessageKey } from './Message'
+import { MessageUpdateType, MessageUserReceiptUpdate, WAMessage, WAMessageKey, WAMessageUpdate } from './Message'
+import { ConnectionState } from './State'
 
 export type BaileysEventMap<T> = {
     /** connection state has been updated -- WS closed, opened, connecting etc. */
 	'connection.update': Partial<ConnectionState>
     /** credentials updated -- some metadata, keys or something */
     'creds.update': Partial<T>
-    /** set chats (history sync), messages are reverse chronologically sorted */
-    'chats.set': { chats: Chat[], messages: WAMessage[], contacts: Contact[] }
+    /** set chats (history sync), chats are reverse chronologically sorted */
+    'chats.set': { chats: Chat[], isLatest: boolean }
+    /** set messages (history sync), messages are reverse chronologically sorted */
+    'messages.set': { messages: WAMessage[], isLatest: boolean }
+    /** set contacts (history sync) */
+    'contacts.set': { contacts: Contact[] }
     /** upsert chats */
     'chats.upsert': Chat[]
     /** update the given chats */
@@ -35,7 +37,7 @@ export type BaileysEventMap<T> = {
      *  */
     'messages.upsert': { messages: WAMessage[], type: MessageUpdateType }
 
-    'message-info.update': MessageInfoUpdate[]
+    'message-receipt.update': MessageUserReceiptUpdate[]
 
     'groups.upsert': GroupMetadata[]
     'groups.update': Partial<GroupMetadata>[]
