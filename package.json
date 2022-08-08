@@ -74,7 +74,9 @@
     "WAProto/*",
     "WASignalGroup/*.js",
     "tsconfig.json",
-    "src/*"
+    "src/*",
+    "package-lock.json",
+    "pacakge.json"
   ],
   "devDependencies": {
     "@adiwajshing/eslint-config": "git+https://github.com/adiwajshing/eslint-config",
