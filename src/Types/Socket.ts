@@ -8,11 +8,9 @@ import { MediaConnInfo } from './Message'
 export type WAVersion = [number, number, number]
 export type WABrowserDescription = [string, string, string]
 
-export type CommonSocketConfig<T> = {
-    /** provide an auth state object to maintain the auth state */
-    auth?: T
+export type CommonSocketConfig = {
     /** the WS url to connect to WA */
-    waWebSocketUrl: string | URL 
+    waWebSocketUrl: string | URL
     /** Fails the connection if the socket times out in this interval */
 	connectTimeoutMs: number
     /** Default timeout for queries, undefined for no timeout */
@@ -35,6 +33,10 @@ export type CommonSocketConfig<T> = {
     emitOwnEvents: boolean
     /** provide a cache to store media, so does not have to be re-uploaded */
     mediaCache?: NodeCache
-
+    /** custom upload hosts to upload media to */
     customUploadHosts: MediaConnInfo['hosts']
+    /** time to wait between sending new retry requests */
+    retryRequestDelayMs: number
+    /** time to wait for the generation of the next QR in ms */
+    qrTimeout?: number;
 }

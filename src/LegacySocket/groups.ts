@@ -6,8 +6,8 @@ import makeMessagesSocket from './messages'
 const makeGroupsSocket = (config: LegacySocketConfig) => {
 	const { logger } = config
 	const sock = makeMessagesSocket(config)
-	const { 
-		ev, 
+	const {
+		ev,
 		ws: socketEvents,
 		query,
 		generateMessageTag,
@@ -23,16 +23,16 @@ const makeGroupsSocket = (config: LegacySocketConfig) => {
 			{
 				tag: 'group',
 				attrs: {
-					author: state.legacy?.user?.id,
+					author: state.legacy?.user?.id!,
 					id: tag,
 					type: type,
-					jid: jid,
-					subject: subject,
+					jid: jid!,
+					subject: subject!,
 				},
-				content: participants ? 
+				content: participants ?
 					participants.map(jid => (
 						{ tag: 'participant', attrs: { jid } }
-					)) : 
+					)) :
 					additionalNodes
 			}
 		], [WAMetric.group, 136], tag)
@@ -42,15 +42,15 @@ const makeGroupsSocket = (config: LegacySocketConfig) => {
 	/** Get the metadata of the group from WA */
 	const groupMetadataFull = async(jid: string) => {
 		const metadata = await query({
-			json: ['query', 'GroupMetadata', jid], 
+			json: ['query', 'GroupMetadata', jid],
 			expect200: true
-		}) 
+		})
 
 		const meta: GroupMetadata = {
 			id: metadata.id,
 			subject: metadata.subject,
 			creation: +metadata.creation,
-			owner: jidNormalizedUser(metadata.owner),
+			owner: metadata.owner ? jidNormalizedUser(metadata.owner) : undefined,
 			desc: metadata.desc,
 			descOwner: metadata.descOwner,
 			participants: metadata.participants.map(
@@ -58,7 +58,8 @@ const makeGroupsSocket = (config: LegacySocketConfig) => {
 					id: jidNormalizedUser(p.id),
 					admin: p.isSuperAdmin ? 'super-admin' : p.isAdmin ? 'admin' : undefined
 				})
-			)
+			),
+			ephemeralDuration: metadata.ephemeralDuration
 		}
 
 		return meta
@@ -68,10 +69,10 @@ const makeGroupsSocket = (config: LegacySocketConfig) => {
 	const groupMetadataMinimal = async(jid: string) => {
 		const { attrs, content }:BinaryNode = await query({
 			json: {
-				tag: 'query', 
+				tag: 'query',
 				attrs: { type: 'group', jid: jid, epoch: currentEpoch().toString() }
 			},
-			binaryTag: [WAMetric.group, WAFlag.ignore], 
+			binaryTag: [WAMetric.group, WAFlag.ignore],
 			expect200: true
 		})
 		const participants: GroupParticipant[] = []
@@ -95,13 +96,13 @@ const makeGroupsSocket = (config: LegacySocketConfig) => {
 			id: jid,
 			owner: attrs?.creator,
 			creation: +attrs?.create,
-			subject: null,
+			subject: '',
 			desc,
 			participants
 		}
 		return meta
 	}
-	
+
 	socketEvents.on('CB:Chat,cmd:action', (json: BinaryNode) => {
 		/*const data = json[1].data
 		if (data) {
@@ -137,7 +138,7 @@ const makeGroupsSocket = (config: LegacySocketConfig) => {
 				result = await groupMetadataFull(jid)
 			}
 
-			return result 
+			return result
 		},
 		/**
 		 * Create a group
@@ -145,8 +146,8 @@ const makeGroupsSocket = (config: LegacySocketConfig) => {
 		 * @param participants people to include in the group
 		 */
 		groupCreate: async(title: string, participants: string[]) => {
-			const response = await groupQuery('create', null, title, participants) as WAGroupCreateResponse
-			const gid = response.gid
+			const response = await groupQuery('create', undefined, title, participants) as WAGroupCreateResponse
+			const gid = response.gid!
 			let metadata: GroupMetadata
 			try {
 				metadata = await groupMetadataFull(gid)
@@ -198,11 +199,11 @@ const makeGroupsSocket = (config: LegacySocketConfig) => {
 			const metadata = await groupMetadataFull(jid)
 			const node: BinaryNode = {
 				tag: 'description',
-				attrs: { id: generateMessageID(), prev: metadata?.descId },
+				attrs: { id: generateMessageID(), prev: metadata?.descId! },
 				content: Buffer.from(description, 'utf-8')
 			}
 
-			const response = await groupQuery ('description', jid, null, null, [node])
+			const response = await groupQuery('description', jid, undefined, undefined, [node])
 			ev.emit('groups.update', [ { id: jid, desc: description } ])
 			return response
 		},
@@ -212,29 +213,30 @@ const makeGroupsSocket = (config: LegacySocketConfig) => {
 		 * @param participants the people to add
 		 */
 		groupParticipantsUpdate: async(id: string, participants: string[], action: ParticipantAction) => {
-			const result: GroupModificationResponse = await groupQuery(action, id, null, participants)
+			const result: GroupModificationResponse = await groupQuery(action, id, undefined, participants)
 			const jids = Object.keys(result.participants || {})
 			ev.emit('group-participants.update', { id, participants: jids, action })
-			return jids
+			return Object.keys(result.participants || {}).map(
+				jid => ({ jid, status: result.participants?.[jid] })
+			)
 		},
 		/** Query broadcast list info */
-		getBroadcastListInfo: async(jid: string) => { 
+		getBroadcastListInfo: async(jid: string) => {
 			interface WABroadcastListInfo {
 				status: number
 				name: string
 				recipients?: {id: string}[]
 			}
-			
-			const result = await query({ 
-				json: ['query', 'contact', jid], 
-				expect200: true, 
+
+			const result = await query({
+				json: ['query', 'contact', jid],
+				expect200: true,
 				requiresPhoneConnection: true
 			}) as WABroadcastListInfo
 
 			const metadata: GroupMetadata = {
 				subject: result.name,
 				id: jid,
-				creation: undefined,
 				owner: state.legacy?.user?.id,
 				participants: result.recipients!.map(({ id }) => (
 					{ id: jidNormalizedUser(id), isAdmin: false, isSuperAdmin: false }
@@ -244,8 +246,8 @@ const makeGroupsSocket = (config: LegacySocketConfig) => {
 		},
 		groupInviteCode: async(jid: string) => {
 			const response = await sock.query({
-				json: ['query', 'inviteCode', jid], 
-				expect200: true, 
+				json: ['query', 'inviteCode', jid],
+				expect200: true,
 				requiresPhoneConnection: false
 			})
 			return response.code as string

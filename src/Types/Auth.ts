@@ -1,5 +1,6 @@
 import type { proto } from '../../WAProto'
 import type { Contact } from './Contact'
+import type { MinimalMessage } from './Message'
 
 export type KeyPair = { public: Uint8Array, private: Uint8Array }
 export type SignedKeyPair = { keyPair: KeyPair, signature: Uint8Array, keyId: number }
@@ -13,10 +14,10 @@ export type SignalIdentity = {
 	identifierKey: Uint8Array
 }
 
-export type LTHashState = { 
+export type LTHashState = {
     version: number
     hash: Buffer
-    indexValueMap: { 
+    indexValueMap: {
         [indexMacBase64: string]: { valueMac: Uint8Array | Buffer }
     }
 }
@@ -27,19 +28,27 @@ export type SignalCreds = {
     readonly registrationId: number
 }
 
+export type AccountSettings = {
+    /** unarchive chats when a new message is received */
+    unarchiveChats: boolean
+}
+
 export type AuthenticationCreds = SignalCreds & {
     readonly noiseKey: KeyPair
     readonly advSecretKey: string
-    
+
     me?: Contact
     account?: proto.IADVSignedDeviceIdentity
     signalIdentities?: SignalIdentity[]
     myAppStateKeyId?: string
     firstUnuploadedPreKeyId: number
-    serverHasPreKeys: boolean
     nextPreKeyId: number
 
     lastAccountSyncTimestamp?: number
+    platform?: string
+
+    processedHistoryMessages: MinimalMessage[]
+    accountSettings: AccountSettings
 }
 
 export type SignalDataTypeMap = {
@@ -47,7 +56,7 @@ export type SignalDataTypeMap = {
     'session': any
     'sender-key': any
     'sender-key-memory': { [jid: string]: boolean }
-    'app-state-sync-key': proto.IAppStateSyncKeyData
+    'app-state-sync-key': proto.Message.IAppStateSyncKeyData
     'app-state-sync-version': LTHashState
 }
 
@@ -64,6 +73,11 @@ export type SignalKeyStoreWithTransaction = SignalKeyStore & {
     isInTransaction: () => boolean
     transaction(exec: () => Promise<void>): Promise<void>
     prefetch<T extends keyof SignalDataTypeMap>(type: T, ids: string[]): Promise<void>
+}
+
+export type TransactionCapabilityOptions = {
+	maxCommitRetries: number
+	delayBetweenTriesMs: number
 }
 
 export type SignalAuthState = {
